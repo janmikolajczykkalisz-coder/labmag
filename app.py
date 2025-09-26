@@ -8,7 +8,7 @@ from ui import sidebar, product_list, deleted_items_history, add_product_form
 
 st.set_page_config(page_title="Lab Magazyn", layout="centered")
 
-# Logowanze
+# Logowanie
 login()
 
 # Inicjalizacja stanów

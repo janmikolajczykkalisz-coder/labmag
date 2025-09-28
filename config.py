@@ -15,6 +15,7 @@ def get_worksheet():
 
     # zamiast client.open() używamy klucza
     return client.open_by_key(spreadsheet_key).worksheet(sheet_name)
-    ws = get_worksheet()
+    
+
 
 

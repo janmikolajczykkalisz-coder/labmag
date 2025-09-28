@@ -1,19 +1,17 @@
-import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
+from oauth2client.service_account import ServiceAccountCredentials
+import streamlit as st
 
 @st.cache_resource
 def get_worksheet():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        dict(st.secrets["gcp_service_account"]), scope
+    )
     client = gspread.authorize(creds)
 
+    spreadsheet_key = st.secrets["spreadsheet_key"]
     sheet_name = st.secrets.get("sheet_name", "Sheet1")
-    key = st.secrets.get("spreadsheet_key")
-    if key:
-        return client.open_by_key(key).worksheet(sheet_name)
-    else:
-        title = st.secrets.get("spreadsheet_title", "Magazyn")
-        return client.open(title).worksheet(sheet_name)
 
-ws = get_worksheet()
+    # zamiast client.open() używamy klucza
+    return client.open_by_key(spreadsheet_key).worksheet(sheet_name)

@@ -2,7 +2,9 @@ import uuid
 import pandas as pd
 import streamlit as st
 from gspread.utils import rowcol_to_a1
-from config import ws
+from config import get_worksheet
+
+ws = get_worksheet()
 
 @st.cache_data(ttl=60)
 def load_data():
@@ -47,3 +49,4 @@ def save_deltas(df, deltas):
             updates.append({"range": a1, "values": [[int(df.at[idx[0], "Stan"])]]})
     if updates:
         ws.batch_update(updates, value_input_option="RAW")
+

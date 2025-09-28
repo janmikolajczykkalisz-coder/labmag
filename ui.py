@@ -1,7 +1,7 @@
 import streamlit as st
 from helpers import reset_filters, refresh_from_sheet
 from data import save_full, save_deltas
-import os
+
 
 def sidebar(df):
     with st.sidebar:
@@ -68,11 +68,7 @@ def product_list(view, queue_delta):
             st.markdown(f"**Nr seryjny:** {row['Nr seryjny']}")
             st.markdown(f"**Lokalizacja:** {row['Lokalizacja']}")
             st.markdown(f"**Stan:** {int(row['Stan'])}")
-
-            # Wyświetlenie zdjęcia
-            zdjecie_path = row.get("Zdjecie")
-            if isinstance(zdjecie_path, str) and zdjecie_path and os.path.exists(zdjecie_path):
-                st.image(zdjecie_path, width=150)
+            st.markdown(f"**Zdjęcie:** {row['Zdjecie']}")
 
             c1, c2, c3, c4 = st.columns(4)
             if c1.button("➕", key=f"plus_{row['ID']}_{idx}"):
@@ -107,20 +103,8 @@ def product_list(view, queue_delta):
                     "Stan": st.number_input(
                         "Stan", min_value=0, step=1, value=int(row["Stan"])
                     ),
+                    "Zdjecie": st.text_input("Zdjęcie", value=row.get("Zdjecie", "")),
                 }
-
-                # Upload zdjęcia
-                zdjecie = st.file_uploader("Zdjęcie produktu", type=["png", "jpg", "jpeg"])
-                if zdjecie is not None:
-                    folder = "images"
-                    os.makedirs(folder, exist_ok=True)
-                    path = os.path.join(folder, f"{row['ID']}_{zdjecie.name}")
-                    with open(path, "wb") as f:
-                        f.write(zdjecie.getbuffer())
-                    edited["Zdjecie"] = path
-                else:
-                    edited["Zdjecie"] = row.get("Zdjecie", "")
-
                 save_edit = st.form_submit_button("💾 Zapisz zmiany")
                 cancel_edit = st.form_submit_button("❌ Anuluj")
 
@@ -128,7 +112,7 @@ def product_list(view, queue_delta):
                     for col, val in edited.items():
                         st.session_state.df_cache.loc[
                             st.session_state.df_cache["ID"] == row["ID"], col
-                        ] = str(val) if col != "Stan" else int(val)
+                        ] = str(val) if col not in ["Stan"] else int(val)
                     st.session_state.require_full_save = True
                     st.session_state["edit_item"] = None
                     st.success(
@@ -171,31 +155,38 @@ def add_product_form(df, queue_delta):
             "Lokalizacja": st.text_input("Lokalizacja").strip(),
             "Stan": st.number_input("Stan", min_value=0, step=1),
         }
-
-        # Upload zdjęcia
-        zdjecie = st.file_uploader("Zdjęcie produktu", type=["png", "jpg", "jpeg"])
-
         submitted = st.form_submit_button("✅ Dodaj produkt")
 
         if submitted:
             if not nowy["Produkt"]:
                 st.warning("⚠️ Podaj przynajmniej nazwę produktu.")
             else:
-                nowy["ID"] = str(uuid.uuid4())
-                nowy["Zdjecie"] = ""
-
-                if zdjecie is not None:
-                    folder = "images"
-                    os.makedirs(folder, exist_ok=True)
-                    path = os.path.join(folder, f"{nowy['ID']}_{zdjecie.name}")
-                    with open(path, "wb") as f:
-                        f.write(zdjecie.getbuffer())
-                    nowy["Zdjecie"] = path
-
-                st.session_state.df_cache.loc[len(st.session_state.df_cache)] = nowy
-                st.session_state.df_cache.reset_index(drop=True, inplace=True)
-                st.session_state.require_full_save = True
-                st.success(
-                    "✅ Dodano nowy produkt (zapisz zmiany aby utrwalić w arkuszu)."
+                istnieje = (
+                    (df["Produkt"].fillna("") == nowy["Produkt"])
+                    & (df["Firma"].fillna("") == nowy["Firma"])
+                    & (df["Typ"].fillna("") == nowy["Typ"])
+                    & (df["Nr seryjny"].fillna("") == nowy["Nr seryjny"])
+                    & (df["Lokalizacja"].fillna("") == nowy["Lokalizacja"])
                 )
-                st.rerun()
+                if istnieje.any():
+                    idx = df[istnieje].index[0]
+                    queue_delta(df, df.at[idx, "ID"], int(nowy["Stan"]))
+                    st.success(
+                        f"✅ Zwiększono stan produktu '{nowy['Produkt']}' o {int(nowy['Stan'])} szt."
+                    )
+                    st.rerun()
+                else:
+                    nowy["ID"] = str(uuid.uuid4())
+                    for col in ["Produkt", "Firma", "Typ", "Nr seryjny", "Lokalizacja"]:
+                        nowy[col] = str(nowy[col]).strip()
+                    nowy["Stan"] = int(nowy["Stan"])
+                    nowy["Zdjecie"] = ""
+                    st.session_state.df_cache.loc[
+                        len(st.session_state.df_cache)
+                    ] = nowy
+                    st.session_state.df_cache.reset_index(drop=True, inplace=True)
+                    st.session_state.require_full_save = True
+                    st.success(
+                        "✅ Dodano nowy produkt (zapisz zmiany aby utrwalić w arkuszu)."
+                    )
+                    st.rerun()
